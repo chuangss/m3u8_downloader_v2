@@ -199,13 +199,6 @@ class M3U8DownloadTask {
         M3U8Log.d("start download ,SaveDir: " + saveDir);
         mHandler.sendEmptyMessage(WHAT_ON_START_DOWNLOAD);
         this.onTaskDownloadListener = onTaskDownloadListener;
-        if (M3U8DownloaderConfig.isConvert()) {
-            File file = new File(saveDir + ".mp4");
-            if (file.exists()) {
-                mHandler.sendEmptyMessage(WHAT_ON_SUCCESS);
-                return;
-            }
-        }
         if (!isRunning()) {
             this.isRunning = true;
             this.firstStart = false;
@@ -288,6 +281,13 @@ class M3U8DownloadTask {
                     //Log.d("DEBUG", String.format("parsed m3u8 info: %s", url));
                     m3U8.setUrl(url);
                     currentM3U8 = m3U8;
+                    if (M3U8DownloaderConfig.isConvert()) {
+                        File file = new File(saveDir + ".mp4");
+                        if (file.exists()) {
+                            mHandler.sendEmptyMessage(WHAT_ON_SUCCESS);
+                            return;
+                        }
+                    }
                         // 开始下载
                     if(isRunning){
                         startDownload(m3U8);
@@ -296,6 +296,14 @@ class M3U8DownloadTask {
             });
             loaderTaskManager.addTask(loaderInfo);
         }else{
+            if (M3U8DownloaderConfig.isConvert()) {
+                File file = new File(saveDir + ".mp4");
+                if (file.exists()) {
+                    mHandler.sendEmptyMessage(WHAT_ON_SUCCESS);
+                    return;
+                }
+            }
+
             if(isRunning){
                 startDownload(currentM3U8);
             }
@@ -440,6 +448,10 @@ class M3U8DownloadTask {
         if(curTs>=totalTs){
             onTaskComplete();
         }else{
+            if(netSpeedTimer!=null){
+                netSpeedTimer.cancel();
+                netSpeedTimer = null;
+            }
             if(netSpeedTimer==null){
                 netSpeedTimer = new Timer();
             }

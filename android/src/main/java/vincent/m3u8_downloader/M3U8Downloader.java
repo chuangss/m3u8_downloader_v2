@@ -60,7 +60,7 @@ public class M3U8Downloader {
 
         M3U8DownloadTask downloadTask = new M3U8DownloadTask();
         downloaderList.add(downloadTask);
-        if(downloaderList.size() > 6){
+        if(downloaderList.size() > 30){
             downloaderList.remove(0);
         }
         return downloadTask;
@@ -128,7 +128,7 @@ public class M3U8Downloader {
      */
     public void pause(String url) {
         Log.e("TAG", "pause:  暂停进来了" + url);
-        Log.e("TAG", "pause:  currentM3U8Task.getUrl()" + currentM3U8Task.getUrl());
+        //Log.e("TAG", "pause:  currentM3U8Task.getUrl()" + currentM3U8Task.getUrl());
         if (TextUtils.isEmpty(url)) return;
         Log.e("TAG", "pause:  downLoadQueue" + downLoadQueue);
         M3U8Task task = downLoadQueue.getTask(url);
@@ -142,8 +142,8 @@ public class M3U8Downloader {
             Log.e("TAG", "pause:  onM3U8DownloadListener end");
 
 
-            Log.e("TAG", "url.equals(currentM3U8Task.getUrl())" + url.equals(currentM3U8Task.getUrl()));
-            if (url.equals(currentM3U8Task.getUrl())) {
+            //Log.e("TAG", "url.equals(currentM3U8Task.getUrl())" + url.equals(currentM3U8Task.getUrl()));
+            if (currentM3U8Task!=null&&url.equals(currentM3U8Task.getUrl())) {
                 Log.e("TAG", "pause: " + currentM3U8Task.getUrl());
                 currentM3U8DownLoadTask.stop();
                 downloadNextTask();
@@ -294,6 +294,7 @@ public class M3U8Downloader {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                removeDownloadTask(url);
                 String saveDir = MUtils.getSaveFileDir(url);
                 // 删除文件夹
                 boolean isDelete = MUtils.clearDir(new File(saveDir));
@@ -328,6 +329,7 @@ public class M3U8Downloader {
             public void run() {
                 boolean isDelete = true;
                 for (String url : urls) {
+                    removeDownloadTask(url);
                     isDelete = isDelete && MUtils.clearDir(new File(MUtils.getSaveFileDir(url)));
                 }
                 if (listener != null) {
@@ -339,6 +341,17 @@ public class M3U8Downloader {
                 }
             }
         }).start();
+    }
+
+    private M3U8DownloadTask removeDownloadTask(String url){
+        int len=downloaderList.size();
+        for(int i=0;i<len;i++){
+            M3U8DownloadTask task = downloaderList.get(i);
+            if(url.equals(task.getMyUrl())){
+                return downloaderList.remove(i);
+            }
+        }
+        return null;
     }
 
     private OnTaskDownloadListener onTaskDownloadListener = new OnTaskDownloadListener() {
@@ -367,6 +380,10 @@ public class M3U8Downloader {
 
         @Override
         public void onSuccess(M3U8 m3U8) {
+            M3U8DownloadTask task = removeDownloadTask(m3U8.getUrl());
+            if(task!=null){
+                task.stop();
+            }
             currentM3U8DownLoadTask.stop();
             currentM3U8Task.setM3U8(m3U8);
             currentM3U8Task.setState(M3U8TaskState.SUCCESS);
