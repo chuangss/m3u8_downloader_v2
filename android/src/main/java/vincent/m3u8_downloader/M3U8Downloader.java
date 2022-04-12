@@ -358,6 +358,7 @@ public class M3U8Downloader {
         private long lastLength;
         private float downloadProgress;
         public volatile boolean isConvert = false;
+        public volatile boolean isSuccess = false;
 
         @Override
         public void onStartDownload(int totalTs, int curTs) {
@@ -380,6 +381,8 @@ public class M3U8Downloader {
 
         @Override
         public void onSuccess(M3U8 m3U8) {
+            isSuccess = true;
+            isConvert = false;
             M3U8DownloadTask task = removeDownloadTask(m3U8.getUrl());
             if(task!=null){
                 task.stop();
@@ -387,7 +390,6 @@ public class M3U8Downloader {
             currentM3U8DownLoadTask.stop();
             currentM3U8Task.setM3U8(m3U8);
             currentM3U8Task.setState(M3U8TaskState.SUCCESS);
-            isConvert = false;
             if (onM3U8DownloadListener != null) {
                 onM3U8DownloadListener.onDownloadSuccess(currentM3U8Task);
             }
@@ -397,7 +399,7 @@ public class M3U8Downloader {
 
         @Override
         public void onProgress(long curLength) {
-            if(isConvert){
+            if(isSuccess||isConvert){
                 return;
             }
             if(lastLength==0){
@@ -420,12 +422,16 @@ public class M3U8Downloader {
                 onM3U8DownloadListener.onDownloadPrepare(currentM3U8Task);
             }
             isConvert = false;
+            isSuccess = false;
             lastLength = currentM3U8DownLoadTask==null?0:currentM3U8DownLoadTask.getCurLength();
             M3U8Log.d("onDownloadPrepare: " + currentM3U8Task.getUrl());
         }
 
         @Override
         public void onConverting() {
+            if(isSuccess){
+                return;
+            }
             M3U8Log.d("onConverting: " + currentM3U8Task.getUrl());
             isConvert = true;
             currentM3U8Task.setState(M3U8TaskState.CONVERT);
@@ -451,6 +457,7 @@ public class M3U8Downloader {
             }
             M3U8Log.e("onError: " + errorMsg.getMessage());
             isConvert = false;
+            isSuccess = false;
             downloadNextTask();
         }
 

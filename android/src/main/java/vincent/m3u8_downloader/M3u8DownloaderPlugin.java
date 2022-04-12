@@ -417,7 +417,7 @@ public class M3u8DownloaderPlugin implements FlutterPlugin, PluginRegistry.NewIn
             // 添加点击回调
             Intent intent = new Intent(context, getMainActivityClass(context));
             intent.setAction(SELECT_NOTIFICATION);
-            PendingIntent pendingIntent = PendingIntent.getActivity(context, NOTIFICATION_ID, intent, PendingIntent.FLAG_IMMUTABLE);
+            PendingIntent pendingIntent = PendingIntent.getActivity(context, NOTIFICATION_ID, intent, PendingIntent.FLAG_UPDATE_CURRENT);
             builder.setContentIntent(pendingIntent);
 
             builder.setContentText("下载完成").setProgress(0, 0, false);

@@ -321,7 +321,7 @@ class M3U8DownloadTask {
             public void onTransformProgress(float progress) {
                 //LogUtils.i("TAG", "onTransformProgress progress=" + progress);
                 int iProgress = (int)progress;
-                if(iProgress%10==0&&iProgress!=sProgress){
+                if(iProgress%10==0&&iProgress!=sProgress&&iProgress<100){
                     sProgress=iProgress;
                     mHandler.sendEmptyMessage(WHAT_ON_CONVERT);
                 }
