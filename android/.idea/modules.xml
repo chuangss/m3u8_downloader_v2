@@ -3,6 +3,9 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/m3u8_downloader.iml" filepath="$PROJECT_DIR$/.idea/modules/m3u8_downloader.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/m3u8_downloader.androidTest.iml" filepath="$PROJECT_DIR$/.idea/modules/m3u8_downloader.androidTest.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/m3u8_downloader.main.iml" filepath="$PROJECT_DIR$/.idea/modules/m3u8_downloader.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/m3u8_downloader.unitTest.iml" filepath="$PROJECT_DIR$/.idea/modules/m3u8_downloader.unitTest.iml" />
     </modules>
   </component>
 </project>
