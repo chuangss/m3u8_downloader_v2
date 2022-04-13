@@ -29,6 +29,7 @@ import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -36,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
@@ -78,7 +80,7 @@ class M3U8DownloadTask {
     //文件保存的路径
     private String saveDir;
     //当前下载完成的文件个数
-    private volatile int curTs = 0;
+    private AtomicInteger curTs = new AtomicInteger(0);
     //总文件的个数
     private volatile int totalTs = 0;
     //单个文件的大小
@@ -162,11 +164,11 @@ class M3U8DownloadTask {
                     if(totalTs==0){
                         onTaskDownloadListener.onStartDownload(1, 0);
                     }else{
-                        onTaskDownloadListener.onStartDownload(totalTs, curTs);
+                        onTaskDownloadListener.onStartDownload(totalTs, curTs.get());
                     }
                     break;
                 case WHAT_ON_PROGRESS:
-                    onTaskDownloadListener.onDownloading(totalFileSize, itemFileSize, totalTs, curTs);
+                    onTaskDownloadListener.onDownloading(totalFileSize, itemFileSize, totalTs, curTs.get());
                     break;
                 case WHAT_ON_SUCCESS:
                     onTaskDownloadListener.onSuccess(currentM3U8);
@@ -359,10 +361,15 @@ class M3U8DownloadTask {
         if (!dir.exists()) {
             dir.mkdirs();
         }
+        if(netSpeedTimer!=null){
+            netSpeedTimer.cancel();
+            netSpeedTimer = null;
+        }
+
         loadComplete(dir);
 
         totalTs = m3U8.getTsList().size();
-        curTs = 0;
+        curTs.set(0);
         curLength = 0;
         isRunning = true;
         final String basePath = m3U8.getBasePath();
@@ -404,12 +411,15 @@ class M3U8DownloadTask {
 
                 @Override
                 public void success(LoaderInfo info) {
-                    curTs++;
+                    int count = curTs.incrementAndGet();
                     loadedUrls.put(info.getUri(), info.getTotal()+"");
                     writeDirty = true;
                     itemFileSize = info.getTotal();
-                    //Log.d("DEBUG", String.format("current: %s total: %s", curTs, totalTs));
-                    if(curTs >= totalTs){
+                    if(count > totalTs - 10){
+                        Log.d("DEBUG", String.format("current: %s total: %s", count, totalTs));
+                        Log.d("DEBUG", String.format("task size: %s", loaderTaskManager.getSize()));
+                    }
+                    if(count >= totalTs){
                         onTaskComplete();
                     }else{
                         mHandler.sendEmptyMessage(WHAT_ON_PROGRESS);
@@ -428,9 +438,9 @@ class M3U8DownloadTask {
             });
             ts.setLoaderInfo(loaderInfo);
             if(loaderInfo.isCompleted()){
-                curTs++;
+                curTs.incrementAndGet();
             } else if(loadedUrls.containsKey(loaderInfo.getUri())){
-                curTs++;
+                curTs.incrementAndGet();
                 int total = 0;
                 try {
                     total = Integer.parseInt(loadedUrls.get(loaderInfo.getUri()));
@@ -445,13 +455,9 @@ class M3U8DownloadTask {
         }
 
         curLength = getLoadedLength(m3U8);
-        if(curTs>=totalTs){
+        if(curTs.get()>=totalTs){
             onTaskComplete();
         }else{
-            if(netSpeedTimer!=null){
-                netSpeedTimer.cancel();
-                netSpeedTimer = null;
-            }
             if(netSpeedTimer==null){
                 netSpeedTimer = new Timer();
             }
