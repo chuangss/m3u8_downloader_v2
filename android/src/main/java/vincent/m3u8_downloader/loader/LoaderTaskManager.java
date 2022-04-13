@@ -68,6 +68,10 @@ public class LoaderTaskManager {
         this.tasks.clear();
     }
 
+//    private synchronized LoaderTask take() throws InterruptedException {
+//        return tasks.take();
+//    }
+
     private void submit(){
         executor.submit(new Runnable() {
             @Override

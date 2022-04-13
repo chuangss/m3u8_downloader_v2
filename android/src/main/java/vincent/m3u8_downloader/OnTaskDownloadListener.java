@@ -10,7 +10,7 @@ import vincent.m3u8_downloader.bean.M3U8;
  * 描    述: 单独M3U8下载任务下载监听
  * ================================================
  */
-public interface OnTaskDownloadListener extends BaseListener {
+interface OnTaskDownloadListener extends BaseListener {
 
     /**
      *

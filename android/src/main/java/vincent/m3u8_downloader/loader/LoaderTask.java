@@ -14,13 +14,14 @@ import vincent.m3u8_downloader.utils.MUtils;
 public class LoaderTask implements Runnable, Delayed {
 
     public static final int STATE_INIT = 1;        //第一次状态
-    public static final int STATE_COMPLETE = 2;     //完成状态
-    public static final int STATE_RETRY = 3;        //重试状态
-    public static final int STATE_FAILED = 4;       //失败状态
+    public static final int STATE_DOING = 2;     //完成状态
+    public static final int STATE_COMPLETE = 3;     //完成状态
+    public static final int STATE_RETRY = 4;        //重试状态
+    public static final int STATE_FAILED = 5;       //失败状态
 
     private LoaderInfo loaderInfo;
 
-    private int state;          //任务状态
+    private volatile int state;          //任务状态
     private long time;                       //任务执行时间
     private int retryCount;              //已经重试的次数
     private int maxRetryCount;
@@ -102,9 +103,10 @@ public class LoaderTask implements Runnable, Delayed {
             return;
         }
 
-        if(this.state == STATE_COMPLETE){
+        if(this.state==STATE_DOING||this.state == STATE_COMPLETE){
             return;
         }
+        this.state = STATE_DOING;
 
         try{
             if(retryCount==0){

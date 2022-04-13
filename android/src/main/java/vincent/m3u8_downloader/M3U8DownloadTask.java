@@ -1,14 +1,31 @@
 package vincent.m3u8_downloader;
 
+import android.annotation.SuppressLint;
 import android.os.Handler;
 import android.os.Message;
+import android.text.TextUtils;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
 
 import com.jeffmony.m3u8library.VideoProcessManager;
 import com.jeffmony.m3u8library.listener.IVideoTransformListener;
 import com.jeffmony.m3u8library.utils.LogUtils;
 
+import org.json.JSONObject;
+
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -16,6 +33,15 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 import vincent.m3u8_downloader.bean.M3U8;
 import vincent.m3u8_downloader.bean.M3U8Ts;
@@ -23,6 +49,7 @@ import vincent.m3u8_downloader.loader.LoaderHandler;
 import vincent.m3u8_downloader.loader.LoaderInfo;
 import vincent.m3u8_downloader.loader.LoaderInfoType;
 import vincent.m3u8_downloader.loader.LoaderTaskManager;
+import vincent.m3u8_downloader.utils.AES128Utils;
 import vincent.m3u8_downloader.utils.FileUtils;
 import vincent.m3u8_downloader.utils.M3U8Log;
 import vincent.m3u8_downloader.utils.MUtils;
@@ -80,7 +107,7 @@ class M3U8DownloadTask {
     private volatile boolean firstStart = false;
 
     private String myUrl;
-    //    private Handler mHandler = new Handler(new Handler.Callback() {
+//    private Handler mHandler = new Handler(new Handler.Callback() {
 //        @Override
 //        public boolean handleMessage(Message msg) {
 //            //Log.e("MSG", String.format("what: %s", msg.what));
@@ -132,9 +159,9 @@ class M3U8DownloadTask {
                     onTaskDownloadListener.onConverting();
                     break;
                 case WHAT_ON_START_DOWNLOAD:
-                    if (totalTs == 0) {
+                    if(totalTs==0){
                         onTaskDownloadListener.onStartDownload(1, 0);
-                    } else {
+                    }else{
                         onTaskDownloadListener.onStartDownload(totalTs, curTs);
                     }
                     break;
@@ -175,8 +202,8 @@ class M3U8DownloadTask {
         if (!isRunning()) {
             this.isRunning = true;
             this.firstStart = false;
-            if (loaderTaskManager == null) {
-                loaderTaskManager = new LoaderTaskManager();
+            if(loaderTaskManager==null){
+                loaderTaskManager=new LoaderTaskManager();
             }
             loaderTaskManager.clear();
             loaderTaskManager.start();
@@ -203,8 +230,8 @@ class M3U8DownloadTask {
         return isRunning;
     }
 
-    private void onFirstStart() {
-        if (!firstStart) {
+    private void onFirstStart(){
+        if(!firstStart){
             firstStart = true;
             this.onTaskDownloadListener.onStart();
         }
@@ -217,7 +244,8 @@ class M3U8DownloadTask {
      */
     private void getM3U8Info(final String url) {
         Log.d("DEBUG", String.format("the m3u8 info: %s", url));
-        if (currentM3U8 == null || !currentM3U8.getUrl().equals(url)) {
+        if(currentM3U8==null||!currentM3U8.getUrl().equals(url))
+        {
             LoaderInfo loaderInfo = new LoaderInfo();
             loaderInfo.setType(LoaderInfoType.M3U8_INFO);
             loaderInfo.setUri(url);
@@ -260,14 +288,14 @@ class M3U8DownloadTask {
                             return;
                         }
                     }
-                    // 开始下载
-                    if (isRunning) {
+                        // 开始下载
+                    if(isRunning){
                         startDownload(m3U8);
                     }
                 }
             });
             loaderTaskManager.addTask(loaderInfo);
-        } else {
+        }else{
             if (M3U8DownloaderConfig.isConvert()) {
                 File file = new File(saveDir + ".mp4");
                 if (file.exists()) {
@@ -276,7 +304,7 @@ class M3U8DownloadTask {
                 }
             }
 
-            if (isRunning) {
+            if(isRunning){
                 startDownload(currentM3U8);
             }
         }
@@ -286,16 +314,15 @@ class M3U8DownloadTask {
     private void m3u8ToMp4(File m3u8File) {
         final File dir = new File(saveDir);
         final String mp4FilePath = saveDir + ".mp4";
-        VideoProcessManager.getInstance().transformM3U8ToMp4(m3u8File.getAbsolutePath(), mp4FilePath,
-                new IVideoTransformListener() {
-            int sProgress = 0;
+        VideoProcessManager.getInstance().transformM3U8ToMp4(m3u8File.getAbsolutePath(), mp4FilePath, new IVideoTransformListener() {
+            int sProgress=0;
 
             @Override
             public void onTransformProgress(float progress) {
                 //LogUtils.i("TAG", "onTransformProgress progress=" + progress);
-                int iProgress = (int) progress;
-                if (iProgress % 10 == 0 && iProgress != sProgress && iProgress < 100) {
-                    sProgress = iProgress;
+                int iProgress = (int)progress;
+                if(iProgress%10==0&&iProgress!=sProgress&&iProgress<100){
+                    sProgress=iProgress;
                     mHandler.sendEmptyMessage(WHAT_ON_CONVERT);
                 }
             }
@@ -341,7 +368,7 @@ class M3U8DownloadTask {
         final String basePath = m3U8.getBasePath();
         final String host = m3U8.getHost();
 
-        for (final M3U8Ts ts : m3U8.getTsList()) {
+        for(final M3U8Ts ts : m3U8.getTsList()){
             File file;
             try {
                 String fileName = M3U8EncryptHelper.encryptFileName(encryptKey, ts.obtainEncodeTsFileName());
@@ -353,7 +380,7 @@ class M3U8DownloadTask {
             String tsUrl = ts.obtainFullUrl(host, basePath);
             //tsUrl = replaceStr(tsUrl);
 
-            LoaderInfo loaderInfo = ts.getLoaderInfo() != null ? ts.getLoaderInfo() : new LoaderInfo();
+            LoaderInfo loaderInfo = ts.getLoaderInfo()!=null?ts.getLoaderInfo():new LoaderInfo();
             loaderInfo.setType(LoaderInfoType.FILE);
             loaderInfo.setUri(tsUrl);
             loaderInfo.setTarget(file);
@@ -378,13 +405,13 @@ class M3U8DownloadTask {
                 @Override
                 public void success(LoaderInfo info) {
                     curTs++;
-                    loadedUrls.put(info.getUri(), info.getTotal() + "");
+                    loadedUrls.put(info.getUri(), info.getTotal()+"");
                     writeDirty = true;
                     itemFileSize = info.getTotal();
                     //Log.d("DEBUG", String.format("current: %s total: %s", curTs, totalTs));
-                    if (curTs >= totalTs) {
+                    if(curTs >= totalTs){
                         onTaskComplete();
-                    } else {
+                    }else{
                         mHandler.sendEmptyMessage(WHAT_ON_PROGRESS);
                     }
                 }
@@ -400,32 +427,32 @@ class M3U8DownloadTask {
                 }
             });
             ts.setLoaderInfo(loaderInfo);
-            if (loaderInfo.isCompleted()) {
+            if(loaderInfo.isCompleted()){
                 curTs++;
-            } else if (loadedUrls.containsKey(loaderInfo.getUri())) {
+            } else if(loadedUrls.containsKey(loaderInfo.getUri())){
                 curTs++;
                 int total = 0;
                 try {
                     total = Integer.parseInt(loadedUrls.get(loaderInfo.getUri()));
-                } catch (Exception e) {
+                }catch (Exception e){
                     e.printStackTrace();
                 }
                 loaderInfo.setTotal(total);
                 loaderInfo.setLoaded(total);
-            } else {
+            }else{
                 loaderTaskManager.addTask(loaderInfo);
             }
         }
 
         curLength = getLoadedLength(m3U8);
-        if (curTs >= totalTs) {
+        if(curTs>=totalTs){
             onTaskComplete();
-        } else {
-            if (netSpeedTimer != null) {
+        }else{
+            if(netSpeedTimer!=null){
                 netSpeedTimer.cancel();
                 netSpeedTimer = null;
             }
-            if (netSpeedTimer == null) {
+            if(netSpeedTimer==null){
                 netSpeedTimer = new Timer();
             }
             netSpeedTimer.schedule(new TimerTask() {
@@ -439,7 +466,7 @@ class M3U8DownloadTask {
         }
     }
 
-    private void onTaskComplete() {
+    private void onTaskComplete(){
         Log.d("DEBUG", String.format("download ok: %s", totalTs));
         this.stopDownload();
         this.writeComplete(new File(saveDir));
@@ -448,42 +475,42 @@ class M3U8DownloadTask {
             mHandler.sendEmptyMessage(WHAT_ON_CONVERT);
             Log.d("DEBUG", String.format("message ok"));
             currentM3U8.setDirFilePath(saveDir);
-            try {
+            try{
                 File m3u8File = MUtils.createLocalM3U8(new File(saveDir), m3u8FileName, currentM3U8, encryptKey);
                 Log.d("DEBUG", String.format("createLocal ok"));
                 ///转换mp4
                 m3u8ToMp4(m3u8File);
                 Log.d("DEBUG", String.format("try change ok"));
-            } catch (Exception e) {
-                Log.d("DEBUG", String.format("error " + e));
+            }catch (Exception e){
+                Log.d("DEBUG", String.format("error"));
                 mHandler.sendEmptyMessage(WHAT_ON_ERROR);
                 e.printStackTrace();
             }
-        } else {
+        }else{
             stop();
             mHandler.sendEmptyMessage(WHAT_ON_SUCCESS);
         }
     }
 
-    private void loadComplete(File parent) {
-        if (loadedUrls == null || loadedUrls.size() == 0) {
+    private void loadComplete(File parent){
+        if(loadedUrls==null||loadedUrls.size()==0){
             final File completeFile = new File(parent, completeFileName);
-            if (completeFile.exists()) {
+            if(completeFile.exists()){
                 String str = FileUtils.readFileContent(completeFile);
                 loadedUrls = StringUtils.split2HashMap(str, "\r\n", "=");
             }
         }
-        if (loadedUrls == null) {
+        if(loadedUrls==null){
             loadedUrls = new ConcurrentHashMap<>();
         }
     }
 
-    private void writeComplete(File parent) {
-        if (!writeDirty) return;
-        if (loadedUrls != null && loadedUrls.size() > 0) {
+    private void writeComplete(File parent){
+        if(!writeDirty)return;
+        if(loadedUrls!=null&&loadedUrls.size()>0){
             StringBuilder sb = new StringBuilder();
             Iterator it = loadedUrls.entrySet().iterator();
-            while (it.hasNext()) {
+            while (it.hasNext()){
                 Map.Entry<String, String> entry = (Map.Entry<String, String>) it.next();
                 sb.append(entry.getKey()).append("=")
                         .append(entry.getValue()).append("\r\n");
@@ -491,16 +518,16 @@ class M3U8DownloadTask {
             final File completeFile = new File(parent, completeFileName);
             FileUtils.writeFileContent(completeFile, sb.toString());
         }
-        if (loadedUrls == null) {
+        if(loadedUrls==null){
             loadedUrls = new ConcurrentHashMap<>();
         }
     }
 
-    private long getLoadedLength(M3U8 m3U8) {
+    private long getLoadedLength(M3U8 m3U8){
         long len = 0;
-        for (final M3U8Ts ts : m3U8.getTsList()) {
+        for(final M3U8Ts ts : m3U8.getTsList()){
             LoaderInfo loaderInfo = ts.getLoaderInfo();
-            if (loaderInfo != null) {
+            if(loaderInfo!=null){
                 len += loaderInfo.getLoaded();
             }
         }
@@ -565,7 +592,7 @@ class M3U8DownloadTask {
             netSpeedTimer.cancel();
             netSpeedTimer = null;
         }
-        if (loaderTaskManager != null) {
+        if(loaderTaskManager!=null){
             loaderTaskManager.stop();
         }
     }

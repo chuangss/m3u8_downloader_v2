@@ -44,15 +44,15 @@ public class MUtils {
         BufferedReader reader = new BufferedReader(new InputStreamReader(new URL(url).openStream()));
         URI baseUri = new URI(url);
         String basePath = url.substring(0, url.lastIndexOf("/") + 1);
-        int index = url.indexOf("/", url.indexOf("//") + 2);
-        String host = url.substring(0, index > -1 ? index : url.length());
+        int index = url.indexOf("/", url.indexOf("//")+2);
+        String host = url.substring(0, index>-1?index:url.length());
 
         M3U8 ret = new M3U8();
         ret.setHost(host);
         ret.setBasePath(basePath);
 
         String line;
-        BigDecimal zero = new BigDecimal(0);
+        final BigDecimal zero = new BigDecimal("0.0");
         BigDecimal seconds = zero;
         while ((line = reader.readLine()) != null) {
             if (line.startsWith("#")) {
@@ -77,38 +77,42 @@ public class MUtils {
                                 v = v.replaceAll("'", "");
                                 String keyUrl = baseUri.resolve(v).toString();
                                 m3U8Key.setUrl(keyUrl);
-//                                BufferedReader keyReader = new BufferedReader(new InputStreamReader(new URL(keyUrl)
-//                                .openStream()));
+//                                BufferedReader keyReader = new BufferedReader(new InputStreamReader(new URL(keyUrl).openStream()));
 //                                m3U8Key.setUrl(keyReader.readLine());
                                 Log.e("keyUrl========", keyUrl);
                             } else if (k.equals("IV")) {
                                 m3U8Key.setIv(v);
-                            } else if (k.equals("METHOD")) {
+                            } else if (k.equals("METHOD")){
                                 m3U8Key.setMethod(v);
                             }
                         }
                     }
-                    if (!StringUtils.isEmpty(m3U8Key.getMethod()) && !"NONE".equalsIgnoreCase(m3U8Key.getMethod()) && !StringUtils.isEmpty(m3U8Key.getUrl())) {
+                    if(!StringUtils.isEmpty(m3U8Key.getMethod())&&!"NONE".equalsIgnoreCase(m3U8Key.getMethod())&&!StringUtils.isEmpty(m3U8Key.getUrl())){
                         ret.addTs(m3U8Key);
                     }
+                }else if (line.startsWith("#EXT-X-ENDLIST")) {
+                    break;
                 }
                 continue;
             }
             if (line.endsWith("m3u8")) {
                 return parseIndex(baseUri.resolve(line).toString());
             }
-            Log.e("line============>", line);
-            M3U8Ts m3U8Ts = new M3U8Ts();
-            m3U8Ts.setType(M3U8TsType.TS);
-            m3U8Ts.setUrl(line);
-            m3U8Ts.setSeconds(seconds);
-            ret.addTs(m3U8Ts);
-            seconds = zero;
+            Log.e("line============>",line);
+            if(!line.trim().isEmpty()){
+                M3U8Ts m3U8Ts = new M3U8Ts();
+                m3U8Ts.setType(M3U8TsType.TS);
+                m3U8Ts.setUrl(line);
+                m3U8Ts.setSeconds(seconds==null?zero:seconds);
+                ret.addTs(m3U8Ts);
+                seconds = zero;
+            }
         }
         reader.close();
 
         return ret;
     }
+
 
 
     /**
@@ -166,33 +170,33 @@ public class MUtils {
         //bfw.write("#EXT-X-ALLOW-CACHE:YES\n");
         int maxDuration = 0;
         for (M3U8Ts m3U8Ts : m3U8.getTsList()) {//最大时长
-            if (m3U8Ts.getSeconds() != null && m3U8Ts.getSeconds().floatValue() > maxDuration) {
-                maxDuration = (int) Math.ceil(m3U8Ts.getSeconds().floatValue());
+            if(m3U8Ts.getSeconds()!=null&&m3U8Ts.getSeconds().floatValue() > maxDuration){
+                maxDuration = (int)Math.ceil(m3U8Ts.getSeconds().floatValue());
             }
         }
         maxDuration++;
-        bfw.write("#EXT-X-TARGETDURATION:" + maxDuration + "\n");
+        bfw.write("#EXT-X-TARGETDURATION:"+maxDuration+"\n");
         for (M3U8Ts m3U8Ts : m3U8.getTsList()) {
             File file;
             try {
                 String name = M3U8EncryptHelper.encryptFileName(encryptKey, m3U8Ts.obtainEncodeTsFileName());
                 file = new File(m3u8Dir, name);
             } catch (Exception e) {
-                file = new File(m3u8Dir, m3U8Ts.obtainEncodeTsFileName());
+                file = new File(m3u8Dir,  m3U8Ts.obtainEncodeTsFileName());
             }
             String filePath = file.getAbsolutePath();
-            if (m3U8Ts.getType() == M3U8TsType.KEY) {
-                if (StringUtils.isEmpty(m3U8Ts.getIv())) {
-                    if (StringUtils.isEmpty(m3U8Ts.getMethod())) {
+            if(m3U8Ts.getType()==M3U8TsType.KEY){
+                if(StringUtils.isEmpty(m3U8Ts.getIv())){
+                    if(StringUtils.isEmpty(m3U8Ts.getMethod())){
                         bfw.write(String.format("#EXT-X-KEY:METHOD=AES-128,URI=\"%s\"\n", filePath));
-                    } else {
+                    }else{
                         bfw.write(String.format("#EXT-X-KEY:METHOD=%s,URI=\"%s\"\n", m3U8Ts.getMethod(), filePath));
                     }
-                } else {
+                }else{
                     bfw.write(String.format("#EXT-X-KEY:METHOD=%s,IV=%s,URI=\"%s\"\n", m3U8Ts.getMethod(),
                             m3U8Ts.getIv(), filePath));
                 }
-            } else {
+            }else{
                 bfw.write("#EXTINF:" + m3U8Ts.getSeconds().toString() + ",\n");
                 //Log.e("TAG", "createLocalM3U8: " + filePath);
                 bfw.write(filePath);
