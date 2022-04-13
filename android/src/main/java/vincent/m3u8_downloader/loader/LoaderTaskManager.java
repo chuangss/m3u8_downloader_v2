@@ -68,9 +68,9 @@ public class LoaderTaskManager {
         this.tasks.clear();
     }
 
-    private synchronized LoaderTask take() throws InterruptedException {
-        return tasks.take();
-    }
+//    private synchronized LoaderTask take() throws InterruptedException {
+//        return tasks.take();
+//    }
 
     private void submit(){
         executor.submit(new Runnable() {
@@ -80,20 +80,26 @@ public class LoaderTaskManager {
                     return;
                 }
                 try{
-                    LoaderTask task = take();//tasks.take();
-                    task.run();
-                    if(task.getState() == LoaderTask.STATE_DOING){
+                    LoaderTask task = tasks.take();
+                    if(task.getState()==LoaderTask.STATE_DOING){
                         if(isRunning){
                             submit();
                         }
-                    }else if(task.getState() == LoaderTask.STATE_RETRY){
-                        task.setDelay(DELAY_MILLIS);
-                        tasks.add(task);
-                        if(isRunning){
-                            submit();
+                    }else{
+                        task.run();
+                        if(task.getState()==LoaderTask.STATE_DOING){
+                            if(isRunning){
+                                submit();
+                            }
+                        }else if(task.getState() == LoaderTask.STATE_RETRY){
+                            task.setDelay(DELAY_MILLIS);
+                            tasks.add(task);
+                            if(isRunning){
+                                submit();
+                            }
+                        }else if(task.getState() == LoaderTask.STATE_FAILED){
+                            Log.e("Error",String.format("the %s download failed.", task.getLoaderInfo().getUri()));
                         }
-                    }else if(task.getState() == LoaderTask.STATE_FAILED){
-                        Log.e("Error",String.format("the %s download failed.", task.getLoaderInfo().getUri()));
                     }
                 }catch (Exception e){
                     Log.e("task error. %s", e.getMessage());

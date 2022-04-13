@@ -7,6 +7,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import vincent.m3u8_downloader.M3U8DownloaderConfig;
 import vincent.m3u8_downloader.bean.M3U8;
 import vincent.m3u8_downloader.utils.MUtils;
@@ -21,7 +23,7 @@ public class LoaderTask implements Runnable, Delayed {
 
     private LoaderInfo loaderInfo;
 
-    private volatile int state;          //任务状态
+    private AtomicInteger state = new AtomicInteger(STATE_INIT);          //任务状态
     private long time;                       //任务执行时间
     private int retryCount;              //已经重试的次数
     private int maxRetryCount;
@@ -29,7 +31,7 @@ public class LoaderTask implements Runnable, Delayed {
     public LoaderTask(LoaderInfo loaderInfo, long delayMillis, int maxRetryCount){
 
         this.loaderInfo = loaderInfo;
-        this.state = STATE_INIT;
+        this.state.set(STATE_INIT);
         this.time = System.nanoTime() + TimeUnit.NANOSECONDS.convert(delayMillis, TimeUnit.MILLISECONDS);
         this.retryCount = 0;
         this.maxRetryCount = maxRetryCount;
@@ -48,11 +50,11 @@ public class LoaderTask implements Runnable, Delayed {
     }
 
     public int getState() {
-        return state;
+        return state.get();
     }
 
     public void setState(int state) {
-        this.state = state;
+        this.state.set(state);
     }
 
     public long getTime() {
@@ -97,16 +99,17 @@ public class LoaderTask implements Runnable, Delayed {
      */
     @Override
     public void run() {
-
         if(loaderInfo==null){//关服放入的任务loaderInfo为null
-            this.state = STATE_COMPLETE;
+            this.state.set(STATE_COMPLETE);
             return;
         }
 
-        if(this.state==STATE_DOING||this.state == STATE_COMPLETE){
+        int st = this.state.get();
+        if(st==STATE_DOING||st == STATE_COMPLETE){
             return;
         }
-        this.state = STATE_DOING;
+
+        this.state.set(STATE_DOING);
 
         try{
             if(retryCount==0){
@@ -119,9 +122,11 @@ public class LoaderTask implements Runnable, Delayed {
                 loaderInfo.getHandler().onStart(loaderInfo);
             }
             if(this.doLoad(loaderInfo)){
-                this.state = STATE_COMPLETE;
-                if(loaderInfo.getHandler()!=null){
-                    loaderInfo.getHandler().success(loaderInfo);
+                if(this.state.get()!=STATE_COMPLETE){
+                    this.state.set(STATE_COMPLETE);
+                    if(loaderInfo.getHandler()!=null){
+                        loaderInfo.getHandler().success(loaderInfo);
+                    }
                 }
                 return;
             }
@@ -132,12 +137,12 @@ public class LoaderTask implements Runnable, Delayed {
 
         this.retryCount++;
         if(this.retryCount > this.maxRetryCount){
-            this.state = STATE_FAILED;
+            this.state.set(STATE_FAILED);
             if(loaderInfo.getHandler()!=null){
                 loaderInfo.getHandler().fail(loaderInfo);
             }
         }else{
-            this.state = STATE_RETRY;
+            this.state.set(STATE_RETRY);
             if(loaderInfo.getHandler()!=null){
                 loaderInfo.getHandler().onErrorWait(loaderInfo);
             }
