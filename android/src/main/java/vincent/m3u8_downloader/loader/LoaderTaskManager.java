@@ -68,9 +68,9 @@ public class LoaderTaskManager {
         this.tasks.clear();
     }
 
-//    private synchronized LoaderTask take() throws InterruptedException {
-//        return tasks.take();
-//    }
+    private synchronized LoaderTask take() throws InterruptedException {
+        return tasks.take();
+    }
 
     private void submit(){
         executor.submit(new Runnable() {
@@ -80,9 +80,13 @@ public class LoaderTaskManager {
                     return;
                 }
                 try{
-                    LoaderTask task = tasks.take();
+                    LoaderTask task = take();//tasks.take();
                     task.run();
-                    if(task.getState() == LoaderTask.STATE_RETRY){
+                    if(task.getState() == LoaderTask.STATE_DOING){
+                        if(isRunning){
+                            submit();
+                        }
+                    }else if(task.getState() == LoaderTask.STATE_RETRY){
                         task.setDelay(DELAY_MILLIS);
                         tasks.add(task);
                         if(isRunning){
